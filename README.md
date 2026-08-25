@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # homeserviceplatform
 
 A new Flutter project.
@@ -15,3 +16,7 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+=======
+# HomeServicePlatform
+The Home Service Platform is a full-stack mobile application designed to connect customers with professional service providers for various household and maintenance services.
+>>>>>>> 86dfc52285c769873e5c0a37d4b3a2f92e82c52d
