@@ -1,0 +1,575 @@
+import 'package:flutter/material.dart';
+import '../main.dart';
+import 'role_selection.dart';
+
+class _ScheduleItem {
+  final String time;
+  final String service;
+  final String customer;
+  final String location;
+  const _ScheduleItem(this.time, this.service, this.customer, this.location);
+}
+
+class _ActivityItem {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String time;
+  const _ActivityItem(this.icon, this.title, this.subtitle, this.time);
+}
+
+class ServiceProviderHomePage extends StatefulWidget {
+  const ServiceProviderHomePage({super.key});
+
+  @override
+  State<ServiceProviderHomePage> createState() => _ServiceProviderHomePageState();
+}
+
+class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
+  int _navIndex = 0;
+  static const int _profileTabIndex = 4;
+
+  final _schedule = const [
+    _ScheduleItem('10:00 AM', 'Home Cleaning', 'Mr. Suman Shrestha', 'Lazimpat, Kathmandu'),
+    _ScheduleItem('1:00 PM', 'Plumbing Service', 'Mrs. Anita Mahal', 'Maharajgunj, Kathmandu'),
+    _ScheduleItem('4:00 PM', 'Electrical Repair', 'Mr. Ramesh Adhikari', 'Baneshwor, Kathmandu'),
+  ];
+
+  final _activity = const [
+    _ActivityItem(Icons.event_available_rounded, 'New booking received', 'Home Cleaning for 10:00 AM', '9:15 AM'),
+    _ActivityItem(Icons.chat_bubble_outline_rounded, 'Customer message', 'From Mrs. Anita Mahal', '8:45 AM'),
+    _ActivityItem(Icons.star_border_rounded, 'You received a new review', 'Rated 5.0 for Plumbing Service', 'Yesterday'),
+  ];
+
+  void _onNavTap(int index) {
+    if (index == _profileTabIndex) {
+      _showProfileMenu(context);
+      return;
+    }
+    setState(() => _navIndex = index);
+  }
+
+  void _showProfileMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: const BoxDecoration(color: kLightGreenBg, shape: BoxShape.circle),
+                      child: const Icon(Icons.engineering_rounded, color: kPrimaryGreen, size: 26),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Provider Name', // TODO: replace with actual provider name
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          Row(
+                            children: [
+                              const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                              const SizedBox(width: 2),
+                              Text('4.8 Rating', // TODO: replace with actual rating
+                                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 32),
+                _ProfileMenuTile(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Edit Profile',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: navigate to edit profile page
+                  },
+                ),
+                _ProfileMenuTile(
+                  icon: Icons.build_outlined,
+                  label: 'Manage Services',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: navigate to manage services page
+                  },
+                ),
+                _ProfileMenuTile(
+                  icon: Icons.event_available_outlined,
+                  label: 'Availability & Schedule',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: navigate to availability settings
+                  },
+                ),
+                _ProfileMenuTile(
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: 'Earnings & Payouts',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: navigate to earnings page
+                  },
+                ),
+                _ProfileMenuTile(
+                  icon: Icons.history_rounded,
+                  label: 'Job History',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: navigate to job history page
+                  },
+                ),
+                _ProfileMenuTile(
+                  icon: Icons.verified_user_outlined,
+                  label: 'Verification & Documents',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: navigate to verification page
+                  },
+                ),
+                _ProfileMenuTile(
+                  icon: Icons.notifications_outlined,
+                  label: 'Notifications',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: navigate to notifications settings
+                  },
+                ),
+                _ProfileMenuTile(
+                  icon: Icons.help_outline_rounded,
+                  label: 'Help & Support',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: navigate to help page
+                  },
+                ),
+                _ProfileMenuTile(
+                  icon: Icons.settings_outlined,
+                  label: 'Settings',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: navigate to settings page
+                  },
+                ),
+                const Divider(height: 24),
+                _ProfileMenuTile(
+                  icon: Icons.logout_rounded,
+                  label: 'Log Out',
+                  isDestructive: true,
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: clear auth session before navigating back
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RoleSelectionPage()),
+                          (route) => false,
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            // Top bar
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 20, 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      onPressed: () {},
+                      icon: const Icon(Icons.menu_rounded),
+                    ),
+                    Row(
+                      children: [
+                        Icon(Icons.home_repair_service_rounded, color: kAccentGreen, size: 22),
+                        const SizedBox(width: 4),
+                        RichText(
+                          text: const TextSpan(
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                            children: [
+                              TextSpan(text: 'Ghar', style: TextStyle(color: kDarkText)),
+                              TextSpan(text: 'Seva', style: TextStyle(color: kAccentGreen)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      onPressed: () {},
+                      icon: const Icon(Icons.notifications_none_rounded),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Greeting
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Good morning, 👋', style: TextStyle(fontSize: 15)),
+                          const SizedBox(height: 4),
+                          Text('Ready to serve today?',
+                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: kDarkText)),
+                          const SizedBox(height: 4),
+                          Text("Here's what's happening with your business.",
+                              style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => _showProfileMenu(context),
+                      borderRadius: BorderRadius.circular(36),
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        decoration: const BoxDecoration(color: kLightGreenBg, shape: BoxShape.circle),
+                        child: const Icon(Icons.engineering_rounded, color: kPrimaryGreen, size: 36),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Stats banner
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: kPrimaryGreen,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      _StatItem(icon: Icons.assignment_outlined, value: '5', label: 'New Requests'),
+                      _StatItem(icon: Icons.calendar_today_outlined, value: '8', label: "Today's Bookings"),
+                      _StatItem(icon: Icons.check_circle_outline_rounded, value: '12', label: 'Completed Jobs'),
+                      _StatItem(icon: Icons.star_outline_rounded, value: '4.8', label: 'Your Rating'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Today's schedule
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 8),
+              sliver: SliverToBoxAdapter(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Today's Schedule",
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: kDarkText)),
+                    const Text('View All', style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade200),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: List.generate(_schedule.length, (i) {
+                      final s = _schedule[i];
+                      return Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: 68,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(s.time,
+                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        children: [
+                                          Container(width: 6, height: 6,
+                                              decoration: const BoxDecoration(color: kAccentGreen, shape: BoxShape.circle)),
+                                          const SizedBox(width: 4),
+                                          Text('Upcoming', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(s.service, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                      const SizedBox(height: 2),
+                                      Text(s.customer, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.location_on_outlined, size: 13, color: Colors.grey.shade600),
+                                          const SizedBox(width: 3),
+                                          Text(s.location, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: kLightGreenBg,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Text('Confirmed',
+                                      style: TextStyle(fontSize: 11, color: kPrimaryGreen, fontWeight: FontWeight.w600)),
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400, size: 20),
+                              ],
+                            ),
+                          ),
+                          if (i != _schedule.length - 1) Divider(height: 1, color: Colors.grey.shade200),
+                        ],
+                      );
+                    }),
+                  ),
+                ),
+              ),
+            ),
+
+            // Recent activity
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverToBoxAdapter(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Recent Activity',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: kDarkText)),
+                    const Text('View All', style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                    final a = _activity[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: kLightGreenBg,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(a.icon, color: kPrimaryGreen, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(a.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                const SizedBox(height: 2),
+                                Text(a.subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                              ],
+                            ),
+                          ),
+                          Text(a.time, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                        ],
+                      ),
+                    );
+                  },
+                  childCount: _activity.length,
+                ),
+              ),
+            ),
+
+            // Grow your business banner
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: kLightGreenBg,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Grow Your Business',
+                                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: kDarkText)),
+                            const SizedBox(height: 4),
+                            Text('Complete your profile and get more bookings.',
+                                style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+                            const SizedBox(height: 14),
+                            FilledButton(
+                              onPressed: () => _showProfileMenu(context),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: kPrimaryGreen,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('Complete Profile'),
+                                  SizedBox(width: 6),
+                                  Icon(Icons.arrow_forward_rounded, size: 16),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.assignment_turned_in_outlined, color: kAccentGreen, size: 56),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _navIndex,
+        onDestinationSelected: _onNavTap,
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.calendar_today_outlined), selectedIcon: Icon(Icons.calendar_today_rounded), label: 'Bookings'),
+          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet_rounded), label: 'Earnings'),
+          NavigationDestination(icon: Icon(Icons.chat_bubble_outline_rounded), selectedIcon: Icon(Icons.chat_bubble_rounded), label: 'Messages'),
+          NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'Profile'),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileMenuTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  const _ProfileMenuTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDestructive ? Colors.red.shade600 : kDarkText;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: color),
+            const SizedBox(width: 16),
+            Text(label, style: TextStyle(fontSize: 15, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatItem extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+
+  const _StatItem({required this.icon, required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: Colors.white, size: 18),
+          ),
+          const SizedBox(height: 8),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 2),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 10)),
+        ],
+      ),
+    );
+  }
+}
