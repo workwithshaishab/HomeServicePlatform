@@ -1,25 +1,18 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../models/provider_profile.dart';
+import '../services/provider_service.dart';
 import 'role_selection.dart';
 
-class _ScheduleItem {
-  final String time;
-  final String service;
-  final String customer;
-  final String location;
-  const _ScheduleItem(this.time, this.service, this.customer, this.location);
-}
-
-class _ActivityItem {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String time;
-  const _ActivityItem(this.icon, this.title, this.subtitle, this.time);
-}
-
 class ServiceProviderHomePage extends StatefulWidget {
-  const ServiceProviderHomePage({super.key});
+  final String providerName;
+  final String accessToken;
+
+  const ServiceProviderHomePage({
+    super.key,
+    required this.accessToken,
+    this.providerName = 'Provider Name',
+  });
 
   @override
   State<ServiceProviderHomePage> createState() => _ServiceProviderHomePageState();
@@ -29,17 +22,43 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
   int _navIndex = 0;
   static const int _profileTabIndex = 4;
 
-  final _schedule = const [
-    _ScheduleItem('10:00 AM', 'Home Cleaning', 'Mr. Suman Shrestha', 'Lazimpat, Kathmandu'),
-    _ScheduleItem('1:00 PM', 'Plumbing Service', 'Mrs. Anita Mahal', 'Maharajgunj, Kathmandu'),
-    _ScheduleItem('4:00 PM', 'Electrical Repair', 'Mr. Ramesh Adhikari', 'Baneshwor, Kathmandu'),
-  ];
+  ProviderProfile? _profile;
+  bool _loadingProfile = true;
+  String? _profileError;
 
-  final _activity = const [
-    _ActivityItem(Icons.event_available_rounded, 'New booking received', 'Home Cleaning for 10:00 AM', '9:15 AM'),
-    _ActivityItem(Icons.chat_bubble_outline_rounded, 'Customer message', 'From Mrs. Anita Mahal', '8:45 AM'),
-    _ActivityItem(Icons.star_border_rounded, 'You received a new review', 'Rated 5.0 for Plumbing Service', 'Yesterday'),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() {
+      _loadingProfile = true;
+      _profileError = null;
+    });
+
+    try {
+      final profile = await ProviderService.getMyProfile(widget.accessToken);
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _loadingProfile = false;
+      });
+    } on ProviderServiceException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _profileError = e.message;
+        _loadingProfile = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _profileError = 'Something went wrong loading your profile.';
+        _loadingProfile = false;
+      });
+    }
+  }
 
   void _onNavTap(int index) {
     if (index == _profileTabIndex) {
@@ -50,9 +69,11 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
   }
 
   void _showProfileMenu(BuildContext context) {
+    final pageContext = context; // outer page context, stays valid after the sheet closes
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -60,9 +81,10 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 Container(
                   width: 40,
                   height: 4,
@@ -85,14 +107,20 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Provider Name', // TODO: replace with actual provider name
+                          Text(widget.providerName,
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                           Row(
                             children: [
                               const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
                               const SizedBox(width: 2),
-                              Text('4.8 Rating', // TODO: replace with actual rating
-                                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                              Text(
+                                _loadingProfile
+                                    ? 'Loading…'
+                                    : _profile != null
+                                        ? '${_profile!.rating.toStringAsFixed(1)} Rating (${_profile!.reviewsCount})'
+                                        : '— Rating',
+                                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                              ),
                             ],
                           ),
                         ],
@@ -180,21 +208,47 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
                   isDestructive: true,
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: clear auth session before navigating back
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (_) => const RoleSelectionPage()),
-                          (route) => false,
-                    );
+                    _confirmLogout(pageContext);
                   },
                 ),
                 const SizedBox(height: 8),
-              ],
+                ],
+              ),
             ),
           ),
         );
       },
     );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Log Out'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red.shade600),
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      // TODO: clear auth session before navigating back
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const RoleSelectionPage()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -223,7 +277,7 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                             children: [
                               TextSpan(text: 'Ghar', style: TextStyle(color: kDarkText)),
-                              TextSpan(text: 'Seva', style: TextStyle(color: kAccentGreen)),
+                              TextSpan(text: 'Sewa', style: TextStyle(color: kAccentGreen)),
                             ],
                           ),
                         ),
@@ -253,8 +307,58 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
                           Text('Ready to serve today?',
                               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: kDarkText)),
                           const SizedBox(height: 4),
-                          Text("Here's what's happening with your business.",
-                              style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                          if (_loadingProfile)
+                            Text('Loading your profile…',
+                                style: TextStyle(fontSize: 13, color: Colors.grey.shade600))
+                          else if (_profileError != null)
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(_profileError!,
+                                      style: TextStyle(fontSize: 12, color: Colors.red.shade600)),
+                                ),
+                                TextButton(
+                                  onPressed: _loadProfile,
+                                  style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                                  child: const Text('Retry',
+                                      style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.w600)),
+                                ),
+                              ],
+                            )
+                          else
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    _profile?.displayRole ?? 'Service Provider',
+                                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (_profile != null) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: _profile!.verificationStatus == 'verified'
+                                          ? kLightGreenBg
+                                          : Colors.orange.shade50,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      _profile!.verificationStatus == 'verified' ? 'Verified' : 'Pending Verification',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: _profile!.verificationStatus == 'verified'
+                                            ? kPrimaryGreen
+                                            : Colors.orange.shade800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                         ],
                       ),
                     ),
@@ -285,10 +389,22 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
                   ),
                   child: Row(
                     children: [
-                      _StatItem(icon: Icons.assignment_outlined, value: '5', label: 'New Requests'),
-                      _StatItem(icon: Icons.calendar_today_outlined, value: '8', label: "Today's Bookings"),
-                      _StatItem(icon: Icons.check_circle_outline_rounded, value: '12', label: 'Completed Jobs'),
-                      _StatItem(icon: Icons.star_outline_rounded, value: '4.8', label: 'Your Rating'),
+                      // No bookings API exists yet, so these reflect the
+                      // real (currently zero) state rather than fake sample
+                      // numbers. Wire these up once a bookings table/API
+                      // is built.
+                      const _StatItem(icon: Icons.assignment_outlined, value: '0', label: 'New Requests'),
+                      const _StatItem(icon: Icons.calendar_today_outlined, value: '0', label: "Today's Bookings"),
+                      const _StatItem(icon: Icons.check_circle_outline_rounded, value: '0', label: 'Completed Jobs'),
+                      _StatItem(
+                        icon: Icons.star_outline_rounded,
+                        value: _loadingProfile
+                            ? '…'
+                            : _profile != null
+                                ? _profile!.rating.toStringAsFixed(1)
+                                : '—',
+                        label: 'Your Rating',
+                      ),
                     ],
                   ),
                 ),
@@ -313,75 +429,21 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 28),
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey.shade200),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
-                    children: List.generate(_schedule.length, (i) {
-                      final s = _schedule[i];
-                      return Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SizedBox(
-                                  width: 68,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(s.time,
-                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                                      const SizedBox(height: 2),
-                                      Row(
-                                        children: [
-                                          Container(width: 6, height: 6,
-                                              decoration: const BoxDecoration(color: kAccentGreen, shape: BoxShape.circle)),
-                                          const SizedBox(width: 4),
-                                          Text('Upcoming', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(s.service, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                                      const SizedBox(height: 2),
-                                      Text(s.customer, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                                      const SizedBox(height: 2),
-                                      Row(
-                                        children: [
-                                          Icon(Icons.location_on_outlined, size: 13, color: Colors.grey.shade600),
-                                          const SizedBox(width: 3),
-                                          Text(s.location, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: kLightGreenBg,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Text('Confirmed',
-                                      style: TextStyle(fontSize: 11, color: kPrimaryGreen, fontWeight: FontWeight.w600)),
-                                ),
-                                const SizedBox(width: 6),
-                                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400, size: 20),
-                              ],
-                            ),
-                          ),
-                          if (i != _schedule.length - 1) Divider(height: 1, color: Colors.grey.shade200),
-                        ],
-                      );
-                    }),
+                    children: [
+                      Icon(Icons.event_busy_outlined, size: 28, color: Colors.grey.shade400),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No appointments scheduled for today.',
+                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -403,41 +465,20 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                    final a = _activity[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: kLightGreenBg,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(a.icon, color: kPrimaryGreen, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(a.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                                const SizedBox(height: 2),
-                                Text(a.subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                              ],
-                            ),
-                          ),
-                          Text(a.time, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-                        ],
+              sliver: SliverToBoxAdapter(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  alignment: Alignment.center,
+                  child: Column(
+                    children: [
+                      Icon(Icons.history_toggle_off_rounded, size: 26, color: Colors.grey.shade400),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No recent activity yet.',
+                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                       ),
-                    );
-                  },
-                  childCount: _activity.length,
+                    ],
+                  ),
                 ),
               ),
             ),

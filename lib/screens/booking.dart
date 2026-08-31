@@ -28,7 +28,6 @@ class _BookingPageState extends State<BookingPage> {
   void initState() {
     super.initState();
     if (widget.isEmergency) {
-      // Default to "right now" for emergency bookings; still editable.
       _selectedDate = DateTime.now();
       _selectedTime = TimeOfDay.now();
     }

@@ -142,6 +142,68 @@ const List<Service> sampleServices = [
     priceNpr: 1500,
     description: 'Safe chemical treatment to eliminate cockroaches and common household pests.',
   ),
+
+  // ── Newly added services ──
+  Service(
+    id: 's11',
+    name: 'Window & Glass Cleaning',
+    category: 'Cleaning',
+    icon: Icons.cleaning_services_outlined,
+    providerName: 'Sita Tamang',
+    rating: 4.5,
+    reviews: 41,
+    priceNpr: 900,
+    description:
+    'Streak-free cleaning of windows, glass panels, and balcony railings, inside and out.',
+  ),
+  Service(
+    id: 's12',
+    name: 'Water Tank Cleaning',
+    category: 'Cleaning',
+    icon: Icons.cleaning_services_outlined,
+    providerName: 'CleanHome Pest Co.',
+    rating: 4.6,
+    reviews: 38,
+    priceNpr: 1800,
+    description:
+    'Full drain, scrub, and sanitize of overhead or underground water tanks to keep water safe.',
+  ),
+  Service(
+    id: 's13',
+    name: 'Drain Blockage Removal',
+    category: 'Plumbing',
+    icon: Icons.plumbing_outlined,
+    providerName: 'Ram Bahadur',
+    rating: 4.7,
+    reviews: 58,
+    priceNpr: 750,
+    description:
+    'Clear clogged kitchen, bathroom, or floor drains using manual and machine-assisted methods.',
+  ),
+  Service(
+    id: 's14',
+    name: 'Full House Wiring Inspection',
+    category: 'Electrical',
+    icon: Icons.lightbulb_outline_rounded,
+    providerName: 'Arjun Karki',
+    rating: 4.9,
+    reviews: 33,
+    priceNpr: 1100,
+    description:
+    'Complete safety inspection of household wiring, breakers, and earthing to prevent hazards.',
+  ),
+  Service(
+    id: 's15',
+    name: 'Door & Window Repair',
+    category: 'Carpentry',
+    icon: Icons.handyman_outlined,
+    providerName: 'Kishor Lama',
+    rating: 4.5,
+    reviews: 29,
+    priceNpr: 650,
+    description:
+    'Fix sticking doors, broken hinges, misaligned frames, and worn window fittings.',
+  ),
 ];
 
 // Special entry used for the "Emergency Services" quick-book flow.

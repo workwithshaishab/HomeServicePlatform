@@ -1,0 +1,122 @@
+import re
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.models import UserRole, VerificationStatus
+
+_EMAIL_RE = re.compile(r"^[\w.\-+]+@[\w\-]+\.[a-zA-Z]{2,}$")
+
+
+def _validate_identifier(v: str) -> str:
+    """Shared rule: must look like a valid email, or have >=7 digits if not."""
+    v = v.strip().lower()
+
+    if "@" in v:
+        if not _EMAIL_RE.match(v):
+            raise ValueError("Enter a valid email address")
+    else:
+        digits_only = re.sub(r"[^0-9]", "", v)
+        if len(digits_only) < 7:
+            raise ValueError("Enter a valid phone number")
+
+    return v
+
+
+class SignupRequest(BaseModel):
+    full_name: str = Field(min_length=2, max_length=255)
+    identifier: str = Field(min_length=3, description="Email address or phone number")
+    password: str = Field(min_length=6, max_length=128)
+    role: UserRole
+    service_category: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Type of service offered — required when role is 'provider'. "
+        "Pick from a predefined list or a custom value (e.g. from an 'Other' option).",
+    )
+
+    @field_validator("identifier")
+    @classmethod
+    def normalize_identifier(cls, v: str) -> str:
+        return _validate_identifier(v)
+
+    @field_validator("service_category")
+    @classmethod
+    def normalize_service_category(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        return v or None
+
+    @model_validator(mode="after")
+    def require_service_category_for_providers(self):
+        if self.role == UserRole.provider and not self.service_category:
+            raise ValueError("Select the type of service you offer")
+        return self
+
+
+class LoginRequest(BaseModel):
+    identifier: str = Field(min_length=3)
+    password: str
+    role: UserRole
+
+    @field_validator("identifier")
+    @classmethod
+    def normalize_identifier(cls, v: str) -> str:
+        return _validate_identifier(v)
+
+
+class UserOut(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    email: str | None
+    phone: str | None
+    role: UserRole
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
+
+
+class CustomerProfileOut(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    name: str
+    address: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class ProviderProfileOut(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    name: str
+    service_category: str | None
+    experience: int | None
+    address: str | None
+    verification_status: VerificationStatus
+    availability: bool
+    rating: float
+    reviews_count: int
+
+    model_config = {"from_attributes": True}
+
+
+class ProfileUpdateRequest(BaseModel):
+    """
+    Single flexible update body used for both roles — fields that don't
+    apply to the caller's role (e.g. service_category for a customer)
+    are simply ignored server-side.
+    """
+
+    name: str | None = Field(default=None, min_length=2, max_length=255)
+    address: str | None = Field(default=None, max_length=500)
+    service_category: str | None = Field(default=None, max_length=100)
+    experience: int | None = Field(default=None, ge=0, le=80)
+    availability: bool | None = None

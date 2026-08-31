@@ -1,9 +1,26 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import 'login.dart';
+import 'signup.dart';
 
 class RoleSelectionPage extends StatelessWidget {
   const RoleSelectionPage({super.key});
+
+  void _showSignupRolePicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SignupRoleSheet(
+        onPick: (role) {
+          Navigator.pop(context); // close the sheet
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => SignupPage(role: role)),
+          );
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +42,7 @@ class RoleSelectionPage extends StatelessWidget {
                   ),
                   children: [
                     TextSpan(text: 'Ghar', style: TextStyle(color: kDarkText)),
-                    TextSpan(text: 'Seva', style: TextStyle(color: kAccentGreen)),
+                    TextSpan(text: 'Sewa', style: TextStyle(color: kAccentGreen)),
                   ],
                 ),
               ),
@@ -82,9 +99,7 @@ class RoleSelectionPage extends StatelessWidget {
                     style: TextStyle(color: Colors.grey.shade600),
                   ),
                   GestureDetector(
-                    onTap: () {
-                      // TODO: navigate to sign up page
-                    },
+                    onTap: () => _showSignupRolePicker(context),
                     child: const Text(
                       'Sign Up',
                       style: TextStyle(
@@ -99,6 +114,60 @@ class RoleSelectionPage extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet shown from the "Sign Up" link so the user can pick which
+/// kind of account to create before landing on SignupPage.
+class _SignupRoleSheet extends StatelessWidget {
+  final ValueChanged<UserRole> onPick;
+
+  const _SignupRoleSheet({required this.onPick});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Text(
+            'Sign up as',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: kDarkText),
+          ),
+          const SizedBox(height: 16),
+          _RoleCard(
+            icon: Icons.people_alt_rounded,
+            title: 'Customer',
+            subtitle: 'Book trusted home services quickly and easily.',
+            onTap: () => onPick(UserRole.customer),
+          ),
+          const SizedBox(height: 12),
+          _RoleCard(
+            icon: Icons.engineering_rounded,
+            title: 'Service Provider',
+            subtitle: 'Manage bookings and grow your business.',
+            onTap: () => onPick(UserRole.provider),
+          ),
+        ],
       ),
     );
   }

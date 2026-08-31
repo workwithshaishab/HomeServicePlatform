@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../models/provider_profile.dart';
 import '../models/service.dart';
+import '../services/provider_service.dart';
 import 'booking.dart';
-import 'emergency_map.dart';
 import 'role_selection.dart';
 
 class _Category {
@@ -11,16 +12,15 @@ class _Category {
   const _Category(this.name, this.icon);
 }
 
-class _Professional {
-  final String name;
-  final String role;
-  final double rating;
-  final int reviews;
-  const _Professional(this.name, this.role, this.rating, this.reviews);
-}
-
 class CustomerHomePage extends StatefulWidget {
-  const CustomerHomePage({super.key});
+  final String userName;
+  final String userEmail;
+
+  const CustomerHomePage({
+    super.key,
+    this.userName = 'Guest User',
+    this.userEmail = '',
+  });
 
   @override
   State<CustomerHomePage> createState() => _CustomerHomePageState();
@@ -52,16 +52,145 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     ('4', Icons.verified_outlined, 'Service Done', "Sit back and relax! We've got it done."),
   ];
 
-  final _professionals = const [
-    _Professional('Ram Bahadur', 'Plumber', 4.8, 120),
-    _Professional('Sita Tamang', 'Cleaner', 4.7, 98),
-    _Professional('Arjun Karki', 'Electrician', 4.9, 150),
-  ];
+  List<ProviderProfile> _professionals = [];
+  bool _loadingProfessionals = true;
+  String? _professionalsError;
+
+  Future<void> _loadProfessionals() async {
+    setState(() {
+      _loadingProfessionals = true;
+      _professionalsError = null;
+    });
+
+    try {
+      final providers = await ProviderService.listProviders(verifiedOnly: false);
+      if (!mounted) return;
+      setState(() {
+        _professionals = providers;
+        _loadingProfessionals = false;
+      });
+    } on ProviderServiceException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _professionalsError = e.message;
+        _loadingProfessionals = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _professionalsError = 'Something went wrong loading service providers.';
+        _loadingProfessionals = false;
+      });
+    }
+  }
+
+  Widget _buildProfessionalsList() {
+    if (_loadingProfessionals) {
+      return const Center(
+        child: SizedBox(
+          height: 24,
+          width: 24,
+          child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryGreen),
+        ),
+      );
+    }
+
+    if (_professionalsError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _professionalsError!,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: _loadProfessionals,
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                child: const Text('Retry', style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_professionals.isEmpty) {
+      return Center(
+        child: Text(
+          'No service providers yet.',
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+      scrollDirection: Axis.horizontal,
+      itemCount: _professionals.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 12),
+      itemBuilder: (context, index) {
+        final p = _professionals[index];
+        return Container(
+          width: 150,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade200),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircleAvatar(
+                radius: 20,
+                backgroundColor: kLightGreenBg,
+                child: Icon(Icons.person_rounded, color: kPrimaryGreen),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                p.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+              Text(
+                p.displayRole,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: Text(
+                      '${p.rating.toStringAsFixed(1)} (${p.reviewsCount})',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _loadProfessionals();
   }
 
   @override
@@ -93,13 +222,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
-  void _openEmergencyBooking() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const EmergencyMapPage()),
-    );
-  }
-
   void _openCategoryResults(String categoryName) {
     if (categoryName == 'More') return;
     final results = sampleServices.where((s) => s.category == categoryName).toList();
@@ -108,6 +230,20 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       MaterialPageRoute(
         builder: (_) => _CategoryResultsPage(categoryName: categoryName, services: results),
       ),
+    );
+  }
+
+  void _openAllServices() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const _AllServicesPage()),
+    );
+  }
+
+  void _openAllProfessionals() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => _AllProfessionalsPage(professionals: _professionals)),
     );
   }
 
@@ -120,9 +256,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   void _showProfileMenu(BuildContext context) {
+    final pageContext = context; // outer page context, stays valid after the sheet closes
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -130,9 +268,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 Container(
                   width: 40,
                   height: 4,
@@ -155,9 +294,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Guest User', // TODO: replace with actual user name
+                          Text(widget.userName,
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                          Text('guest@example.com', // TODO: replace with actual email
+                          Text(widget.userEmail.isNotEmpty ? widget.userEmail : 'No email on file',
                               style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
                         ],
                       ),
@@ -228,21 +367,47 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                   isDestructive: true,
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: clear auth session before navigating back
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (_) => const RoleSelectionPage()),
-                          (route) => false,
-                    );
+                    _confirmLogout(pageContext);
                   },
                 ),
                 const SizedBox(height: 8),
-              ],
+                ],
+              ),
             ),
           ),
         );
       },
     );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Log Out'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red.shade600),
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      // TODO: clear auth session before navigating back
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const RoleSelectionPage()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -276,7 +441,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                             children: [
                               TextSpan(text: 'Ghar', style: TextStyle(color: kDarkText)),
-                              TextSpan(text: 'Seva', style: TextStyle(color: kAccentGreen)),
+                              TextSpan(text: 'Sewa', style: TextStyle(color: kAccentGreen)),
                             ],
                           ),
                         ),
@@ -422,7 +587,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     children: [
                       Text('Popular Services',
                           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: kDarkText)),
-                      const Text('View All', style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.w600)),
+                      TextButton(
+                        onPressed: _openAllServices,
+                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                        child: const Text('View All',
+                            style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.w600)),
+                      ),
                     ],
                   ),
                 ),
@@ -446,61 +616,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
               ),
 
-              // Emergency banner
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: kLightGreenBg,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Need it urgently?',
-                                  style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.w600)),
-                              const SizedBox(height: 4),
-                              Text('Try our Emergency Services',
-                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: kDarkText)),
-                              const SizedBox(height: 4),
-                              Text('Quick help, right when you need it.',
-                                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
-                              const SizedBox(height: 14),
-                              FilledButton(
-                                onPressed: _openEmergencyBooking,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: kPrimaryGreen,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text('Book Now'),
-                                    SizedBox(width: 6),
-                                    Icon(Icons.arrow_forward_rounded, size: 16),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Icon(Icons.bolt_rounded, color: kAccentGreen, size: 56),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
               // How it works
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 32, 20, 8),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                 sliver: SliverToBoxAdapter(
                   child: Text('How It Works',
                       style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: kDarkText)),
@@ -541,52 +659,20 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     children: [
                       Text('Top Rated Professionals',
                           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: kDarkText)),
-                      const Text('View All', style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.w600)),
+                      TextButton(
+                        onPressed: _openAllProfessionals,
+                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                        child: const Text('View All',
+                            style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.w600)),
+                      ),
                     ],
                   ),
                 ),
               ),
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 130,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _professionals.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) {
-                      final p = _professionals[index];
-                      return Container(
-                        width: 150,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade200),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const CircleAvatar(
-                              radius: 20,
-                              backgroundColor: kLightGreenBg,
-                              child: Icon(Icons.person_rounded, color: kPrimaryGreen),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                            Text(p.role, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
-                                const SizedBox(width: 2),
-                                Text('${p.rating} (${p.reviews})', style: const TextStyle(fontSize: 11)),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                  height: 176,
+                  child: _buildProfessionalsList(),
                 ),
               ),
             ],
@@ -770,6 +856,167 @@ class _CategoryResultsPage extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+// ── "View All" → Popular Services (all services, grouped by category) ──
+class _AllServicesPage extends StatefulWidget {
+  const _AllServicesPage();
+
+  @override
+  State<_AllServicesPage> createState() => _AllServicesPageState();
+}
+
+class _AllServicesPageState extends State<_AllServicesPage> {
+  String _selectedFilter = 'All';
+
+  List<String> get _filters {
+    final categories = sampleServices.map((s) => s.category).toSet().toList();
+    return ['All', ...categories];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _selectedFilter == 'All'
+        ? sampleServices
+        : sampleServices.where((s) => s.category == _selectedFilter).toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('All Services'),
+        backgroundColor: Colors.white,
+        foregroundColor: kDarkText,
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          SizedBox(
+            height: 44,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              scrollDirection: Axis.horizontal,
+              itemCount: _filters.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final filter = _filters[index];
+                final isSelected = filter == _selectedFilter;
+                return ChoiceChip(
+                  label: Text(filter),
+                  selected: isSelected,
+                  onSelected: (_) => setState(() => _selectedFilter = filter),
+                  selectedColor: kLightGreenBg,
+                  labelStyle: TextStyle(
+                    color: isSelected ? kPrimaryGreen : Colors.grey.shade700,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    fontSize: 13,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(color: isSelected ? kPrimaryGreen : Colors.grey.shade300),
+                  ),
+                  backgroundColor: Colors.white,
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.all(20),
+              itemCount: filtered.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final service = filtered[index];
+                return _ServiceCard(
+                  service: service,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => BookingPage(service: service)),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── "View All" → Top Rated Professionals ──
+class _AllProfessionalsPage extends StatelessWidget {
+  final List<ProviderProfile> professionals;
+
+  const _AllProfessionalsPage({required this.professionals});
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = [...professionals]..sort((a, b) => b.rating.compareTo(a.rating));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Top Rated Professionals'),
+        backgroundColor: Colors.white,
+        foregroundColor: kDarkText,
+        elevation: 0,
+      ),
+      body: sorted.isEmpty
+          ? Center(
+              child: Text(
+                'No service providers yet.',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(20),
+              itemCount: sorted.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final p = sorted[index];
+                return Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade200),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 26,
+                        backgroundColor: kLightGreenBg,
+                        child: Icon(Icons.person_rounded, color: kPrimaryGreen),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                            const SizedBox(height: 2),
+                            Text(p.displayRole, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.star_rounded, size: 15, color: Colors.amber),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${p.rating.toStringAsFixed(1)} (${p.reviewsCount} reviews)',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+                    ],
+                  ),
+                );
+              },
+            ),
     );
   }
 }

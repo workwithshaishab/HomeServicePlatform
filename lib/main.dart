@@ -8,16 +8,16 @@ const kDarkText = Color(0xFF1B2B34);
 const kLightGreenBg = Color(0xFFE8F4EC);
 
 void main() {
-  runApp(const GharSevaApp());
+  runApp(const GharSewaApp());
 }
 
-class GharSevaApp extends StatelessWidget {
-  const GharSevaApp({super.key});
+class GharSewaApp extends StatelessWidget {
+  const GharSewaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'GharSeva',
+      title: 'GharSewa',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
