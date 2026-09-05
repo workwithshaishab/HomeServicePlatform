@@ -86,6 +86,7 @@ class _LoginPageState extends State<LoginPage> {
             builder: (_) => CustomerHomePage(
               userName: result.user.fullName,
               userEmail: result.user.email ?? result.user.phone ?? '',
+              accessToken: result.accessToken,
             ),
           ),
         );

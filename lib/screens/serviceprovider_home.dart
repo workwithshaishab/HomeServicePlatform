@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../models/booking.dart';
 import '../models/provider_profile.dart';
+import '../services/booking_service.dart';
 import '../services/provider_service.dart';
 import 'role_selection.dart';
 
@@ -26,10 +28,71 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
   bool _loadingProfile = true;
   String? _profileError;
 
+  List<Booking> _allBookings = [];
+  List<Booking> _pendingBookings = [];
+  List<Booking> _acceptedBookings = [];
+  bool _loadingBookings = true;
+  String? _bookingsError;
+
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _loadBookings();
+  }
+
+  Future<void> _loadBookings() async {
+    setState(() {
+      _loadingBookings = true;
+      _bookingsError = null;
+    });
+
+    try {
+      final bookings = await BookingService.getMyBookings(accessToken: widget.accessToken);
+      if (!mounted) return;
+      setState(() {
+        _allBookings = bookings;
+        _pendingBookings = bookings.where((b) => b.status == 'pending').toList();
+        _acceptedBookings = bookings.where((b) => b.status == 'accepted').toList();
+        _loadingBookings = false;
+      });
+    } on BookingServiceException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _bookingsError = e.message;
+        _loadingBookings = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _bookingsError = 'Something went wrong loading your bookings.';
+        _loadingBookings = false;
+      });
+    }
+  }
+
+  Future<void> _respondToBooking(Booking booking, String status) async {
+    try {
+      await BookingService.updateStatus(
+        accessToken: widget.accessToken,
+        bookingId: booking.id,
+        status: status,
+      );
+      _loadBookings();
+    } on BookingServiceException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red.shade600),
+      );
+    }
+  }
+
+  int _todaysAcceptedCount() {
+    final now = DateTime.now();
+    return _acceptedBookings.where((b) {
+      final d = b.preferredDate;
+      return d != null && d.year == now.year && d.month == now.month && d.day == now.day;
+    }).length;
   }
 
   Future<void> _loadProfile() async {
@@ -389,13 +452,23 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
                   ),
                   child: Row(
                     children: [
-                      // No bookings API exists yet, so these reflect the
-                      // real (currently zero) state rather than fake sample
-                      // numbers. Wire these up once a bookings table/API
-                      // is built.
-                      const _StatItem(icon: Icons.assignment_outlined, value: '0', label: 'New Requests'),
-                      const _StatItem(icon: Icons.calendar_today_outlined, value: '0', label: "Today's Bookings"),
-                      const _StatItem(icon: Icons.check_circle_outline_rounded, value: '0', label: 'Completed Jobs'),
+                      _StatItem(
+                        icon: Icons.assignment_outlined,
+                        value: _loadingBookings ? '…' : '${_pendingBookings.length}',
+                        label: 'New Requests',
+                      ),
+                      _StatItem(
+                        icon: Icons.calendar_today_outlined,
+                        value: _loadingBookings ? '…' : '${_todaysAcceptedCount()}',
+                        label: "Today's Bookings",
+                      ),
+                      _StatItem(
+                        icon: Icons.check_circle_outline_rounded,
+                        value: _loadingBookings
+                            ? '…'
+                            : '${_allBookings.where((b) => b.status == 'completed').length}',
+                        label: 'Completed Jobs',
+                      ),
                       _StatItem(
                         icon: Icons.star_outline_rounded,
                         value: _loadingProfile
@@ -410,6 +483,82 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
                 ),
               ),
             ),
+
+            // New requests — pending bookings awaiting a response
+            if (!_loadingBookings && _pendingBookings.isNotEmpty) ...[
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 28, 20, 8),
+                sliver: SliverToBoxAdapter(
+                  child: Text('New Requests',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: kDarkText)),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final b = _pendingBookings[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade200),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(b.customerName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                              if (b.serviceCategory != null) ...[
+                                const SizedBox(height: 2),
+                                Text(b.serviceCategory!, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                              ],
+                              const SizedBox(height: 6),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.location_on_outlined, size: 13, color: Colors.grey.shade600),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(b.address, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () => _respondToBooking(b, 'rejected'),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.red.shade600,
+                                        side: BorderSide(color: Colors.red.shade200),
+                                      ),
+                                      child: const Text('Decline'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: FilledButton(
+                                      onPressed: () => _respondToBooking(b, 'accepted'),
+                                      style: FilledButton.styleFrom(backgroundColor: kPrimaryGreen),
+                                      child: const Text('Accept'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    childCount: _pendingBookings.length,
+                  ),
+                ),
+              ),
+            ],
 
             // Today's schedule
             SliverPadding(
@@ -428,28 +577,84 @@ class _ServiceProviderHomePageState extends State<ServiceProviderHomePage> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 28),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade200),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(Icons.event_busy_outlined, size: 28, color: Colors.grey.shade400),
-                      const SizedBox(height: 8),
-                      Text(
-                        'No appointments scheduled for today.',
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                child: _acceptedBookings.isEmpty
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(vertical: 28),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade200),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(Icons.event_busy_outlined, size: 28, color: Colors.grey.shade400),
+                            const SizedBox(height: 8),
+                            Text(
+                              'No appointments scheduled for today.',
+                              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade200),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          children: List.generate(_acceptedBookings.length, (i) {
+                            final b = _acceptedBookings[i];
+                            return Column(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(b.customerName,
+                                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                            const SizedBox(height: 2),
+                                            if (b.serviceCategory != null)
+                                              Text(b.serviceCategory!,
+                                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                            const SizedBox(height: 2),
+                                            Row(
+                                              children: [
+                                                Icon(Icons.location_on_outlined, size: 13, color: Colors.grey.shade600),
+                                                const SizedBox(width: 3),
+                                                Expanded(
+                                                  child: Text(b.address,
+                                                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: kLightGreenBg,
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: const Text('Confirmed',
+                                            style: TextStyle(fontSize: 11, color: kPrimaryGreen, fontWeight: FontWeight.w600)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (i != _acceptedBookings.length - 1) Divider(height: 1, color: Colors.grey.shade200),
+                              ],
+                            );
+                          }),
+                        ),
                       ),
-                    ],
-                  ),
-                ),
               ),
             ),
-
-            // Recent activity
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverToBoxAdapter(

@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -27,6 +28,14 @@ class VerificationStatus(str, enum.Enum):
     pending = "pending"
     verified = "verified"
     rejected = "rejected"
+
+
+class BookingStatus(str, enum.Enum):
+    pending = "pending"      # created by customer, awaiting provider response
+    accepted = "accepted"    # provider accepted
+    rejected = "rejected"    # provider declined
+    completed = "completed"  # provider marked the job done
+    cancelled = "cancelled"  # customer cancelled (only while still pending)
 
 
 class User(Base):
@@ -96,5 +105,30 @@ class ProviderProfile(Base):
     rating = Column(Float, nullable=False, default=0.0)
     reviews_count = Column(Integer, nullable=False, default=0)
 
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class Booking(Base):
+    __tablename__ = "bookings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    customer_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    provider_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    service_category = Column(String(100), nullable=True)
+    address = Column(String(500), nullable=False)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    notes = Column(Text, nullable=True)
+    preferred_date = Column(DateTime(timezone=True), nullable=True)
+    status = Column(
+        Enum(BookingStatus, name="booking_status"),
+        nullable=False,
+        default=BookingStatus.pending,
+        index=True,
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

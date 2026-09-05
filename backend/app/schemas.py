@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.models import UserRole, VerificationStatus
+from app.models import BookingStatus, UserRole, VerificationStatus
 
 _EMAIL_RE = re.compile(r"^[\w.\-+]+@[\w\-]+\.[a-zA-Z]{2,}$")
 
@@ -120,3 +120,36 @@ class ProfileUpdateRequest(BaseModel):
     service_category: str | None = Field(default=None, max_length=100)
     experience: int | None = Field(default=None, ge=0, le=80)
     availability: bool | None = None
+
+
+class BookingCreateRequest(BaseModel):
+    provider_id: uuid.UUID
+    service_category: str | None = Field(default=None, max_length=100)
+    address: str = Field(min_length=3, max_length=500)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    notes: str | None = Field(default=None, max_length=1000)
+    preferred_date: datetime | None = None
+
+
+class BookingStatusUpdateRequest(BaseModel):
+    status: BookingStatus
+
+
+class BookingOut(BaseModel):
+    id: uuid.UUID
+    customer_id: uuid.UUID
+    customer_name: str
+    provider_id: uuid.UUID
+    provider_name: str
+    service_category: str | None
+    address: str
+    latitude: float | None
+    longitude: float | None
+    notes: str | None
+    preferred_date: datetime | None
+    status: BookingStatus
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

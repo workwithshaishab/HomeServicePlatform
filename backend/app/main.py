@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.database import Base, engine
-from app.routers import auth, profile, providers
+from app.routers import auth, bookings, profile, providers
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -40,6 +40,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 app.include_router(auth.router)
 app.include_router(profile.router)
 app.include_router(providers.router)
+app.include_router(bookings.router)
 
 
 @app.get("/health")

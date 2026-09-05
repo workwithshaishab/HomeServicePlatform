@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import '../main.dart';
 import '../models/provider_profile.dart';
-import '../models/service.dart';
+import '../services/booking_service.dart';
 import '../services/provider_service.dart';
-import 'booking.dart';
+import 'location_picker.dart';
+import 'my_bookings.dart';
 import 'role_selection.dart';
 
 class _Category {
@@ -15,9 +17,11 @@ class _Category {
 class CustomerHomePage extends StatefulWidget {
   final String userName;
   final String userEmail;
+  final String accessToken;
 
   const CustomerHomePage({
     super.key,
+    required this.accessToken,
     this.userName = 'Guest User',
     this.userEmail = '',
   });
@@ -31,7 +35,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   static const int _profileTabIndex = 4;
 
   final _searchController = TextEditingController();
-  List<Service> _searchResults = [];
+  List<ProviderProfile> _searchResults = [];
   bool get _isSearching => _searchController.text.trim().isNotEmpty;
 
   final _categories = const [
@@ -43,13 +47,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     _Category('Appliance Repair', Icons.local_laundry_service_outlined),
     _Category('Pest Control', Icons.pest_control_outlined),
     _Category('More', Icons.more_horiz_rounded),
-  ];
-
-  final _steps = const [
-    ('1', Icons.description_outlined, 'Choose Service', 'Select the service you need'),
-    ('2', Icons.calendar_today_outlined, 'Pick Date & Time', 'Choose a convenient time slot'),
-    ('3', Icons.person_outline_rounded, 'We Assign Expert', "We'll connect you with a verified pro"),
-    ('4', Icons.verified_outlined, 'Service Done', "Sit back and relax! We've got it done."),
   ];
 
   List<ProviderProfile> _professionals = [];
@@ -135,51 +132,55 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       separatorBuilder: (_, __) => const SizedBox(width: 12),
       itemBuilder: (context, index) {
         final p = _professionals[index];
-        return Container(
-          width: 150,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade200),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircleAvatar(
-                radius: 20,
-                backgroundColor: kLightGreenBg,
-                child: Icon(Icons.person_rounded, color: kPrimaryGreen),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                p.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-              Text(
-                p.displayRole,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
-                  const SizedBox(width: 2),
-                  Expanded(
-                    child: Text(
-                      '${p.rating.toStringAsFixed(1)} (${p.reviewsCount})',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11),
+        return InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _openBookingForm(p),
+          child: Container(
+            width: 150,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade200),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: kLightGreenBg,
+                  child: Icon(Icons.person_rounded, color: kPrimaryGreen),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  p.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                Text(
+                  p.displayRole,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                    const SizedBox(width: 2),
+                    Expanded(
+                      child: Text(
+                        '${p.rating.toStringAsFixed(1)} (${p.reviewsCount})',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -206,29 +207,25 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       if (query.isEmpty) {
         _searchResults = [];
       } else {
-        _searchResults = sampleServices.where((s) {
-          return s.name.toLowerCase().contains(query) ||
-              s.category.toLowerCase().contains(query) ||
-              s.providerName.toLowerCase().contains(query);
+        _searchResults = _professionals.where((p) {
+          return p.name.toLowerCase().contains(query) ||
+              p.displayRole.toLowerCase().contains(query);
         }).toList();
       }
     });
   }
 
-  void _openBooking(Service service) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => BookingPage(service: service)),
-    );
-  }
-
   void _openCategoryResults(String categoryName) {
     if (categoryName == 'More') return;
-    final results = sampleServices.where((s) => s.category == categoryName).toList();
+    final results = _professionals.where((p) => p.serviceCategory == categoryName).toList();
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => _CategoryResultsPage(categoryName: categoryName, services: results),
+        builder: (_) => _CategoryResultsPage(
+          categoryName: categoryName,
+          providers: results,
+          onBook: _openBookingForm,
+        ),
       ),
     );
   }
@@ -236,14 +233,283 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   void _openAllServices() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const _AllServicesPage()),
+      MaterialPageRoute(
+        builder: (_) => _AllServicesPage(providers: _professionals, onBook: _openBookingForm),
+      ),
     );
   }
 
   void _openAllProfessionals() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => _AllProfessionalsPage(professionals: _professionals)),
+      MaterialPageRoute(
+        builder: (_) => _AllProfessionalsPage(professionals: _professionals, onBook: _openBookingForm),
+      ),
+    );
+  }
+
+  Future<void> _openBookingForm(ProviderProfile provider) async {
+    final pageContext = context; // survives after the sheet closes
+    final notesController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    DateTime? preferredDate;
+    TimeOfDay? preferredTime;
+    PickedLocation? pickedLocation;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 12,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      Text('Book ${provider.name}',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: kDarkText)),
+                      const SizedBox(height: 2),
+                      Text(provider.displayRole, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                      const SizedBox(height: 20),
+                      const Text('Address',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: kDarkText)),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () async {
+                          final result = await Navigator.push<PickedLocation>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LocationPickerPage(
+                                initialLocation: pickedLocation != null
+                                    ? LatLng(pickedLocation!.latitude, pickedLocation!.longitude)
+                                    : null,
+                              ),
+                            ),
+                          );
+                          if (result != null) setSheetState(() => pickedLocation = result);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.location_on_outlined,
+                                  size: 18, color: pickedLocation != null ? kPrimaryGreen : Colors.grey.shade600),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  pickedLocation?.address ?? 'Choose your location on the map',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: pickedLocation != null ? kDarkText : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ),
+                              Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('Preferred Date & Time (optional)',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: kDarkText)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(14),
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: DateTime.now().add(const Duration(days: 1)),
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime.now().add(const Duration(days: 90)),
+                                );
+                                if (picked != null) setSheetState(() => preferredDate = picked);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey.shade300),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.calendar_today_outlined, size: 18, color: Colors.grey.shade600),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        preferredDate != null
+                                            ? '${preferredDate!.year}-${preferredDate!.month.toString().padLeft(2, '0')}-${preferredDate!.day.toString().padLeft(2, '0')}'
+                                            : 'Select a date',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(color: preferredDate != null ? kDarkText : Colors.grey.shade600),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(14),
+                              onTap: () async {
+                                final picked = await showTimePicker(
+                                  context: context,
+                                  initialTime: preferredTime ?? const TimeOfDay(hour: 9, minute: 0),
+                                );
+                                if (picked != null) setSheetState(() => preferredTime = picked);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey.shade300),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.access_time_rounded, size: 18, color: Colors.grey.shade600),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        preferredTime != null ? preferredTime!.format(context) : 'Select time',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(color: preferredTime != null ? kDarkText : Colors.grey.shade600),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('Notes (optional)',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: kDarkText)),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: notesController,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          hintText: 'Describe what you need...',
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: kPrimaryGreen,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: () async {
+                            if (!formKey.currentState!.validate()) return;
+                            if (pickedLocation == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please choose your location on the map')),
+                              );
+                              return;
+                            }
+                            if (preferredTime != null && preferredDate == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please also select a date for that time')),
+                              );
+                              return;
+                            }
+                            final DateTime? combinedDateTime = preferredDate == null
+                                ? null
+                                : DateTime(
+                              preferredDate!.year,
+                              preferredDate!.month,
+                              preferredDate!.day,
+                              preferredTime?.hour ?? 9,
+                              preferredTime?.minute ?? 0,
+                            );
+                            try {
+                              await BookingService.createBooking(
+                                accessToken: widget.accessToken,
+                                providerId: provider.userId,
+                                address: pickedLocation!.address,
+                                latitude: pickedLocation!.latitude,
+                                longitude: pickedLocation!.longitude,
+                                serviceCategory: provider.serviceCategory,
+                                notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                                preferredDate: combinedDateTime,
+                              );
+                              Navigator.pop(sheetContext);
+                              if (pageContext.mounted) {
+                                ScaffoldMessenger.of(pageContext).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Booking request sent!'),
+                                    backgroundColor: kPrimaryGreen,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            } on BookingServiceException catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(e.message),
+                                    backgroundColor: Colors.red.shade600,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          child: const Text('Send Booking Request',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -251,6 +517,13 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     if (index == _profileTabIndex) {
       _showProfileMenu(context);
       return; // keep current tab selected/highlighted; sheet is transient
+    }
+    if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => MyBookingsPage(accessToken: widget.accessToken)),
+      );
+      return; // transient navigation, keep current tab highlighted
     }
     setState(() => _navIndex = index);
   }
@@ -272,105 +545,105 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
-                Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: const BoxDecoration(color: kLightGreenBg, shape: BoxShape.circle),
-                      child: const Icon(Icons.person_rounded, color: kPrimaryGreen, size: 28),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(widget.userName,
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                          Text(widget.userEmail.isNotEmpty ? widget.userEmail : 'No email on file',
-                              style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-                        ],
+                  Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: const BoxDecoration(color: kLightGreenBg, shape: BoxShape.circle),
+                        child: const Icon(Icons.person_rounded, color: kPrimaryGreen, size: 28),
                       ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 32),
-                _ProfileMenuTile(
-                  icon: Icons.person_outline_rounded,
-                  label: 'Edit Profile',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: navigate to edit profile page
-                  },
-                ),
-                _ProfileMenuTile(
-                  icon: Icons.calendar_today_outlined,
-                  label: 'My Bookings',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: navigate to bookings page
-                  },
-                ),
-                _ProfileMenuTile(
-                  icon: Icons.location_on_outlined,
-                  label: 'Saved Addresses',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: navigate to addresses page
-                  },
-                ),
-                _ProfileMenuTile(
-                  icon: Icons.payment_outlined,
-                  label: 'Payment Methods',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: navigate to payment methods page
-                  },
-                ),
-                _ProfileMenuTile(
-                  icon: Icons.notifications_outlined,
-                  label: 'Notifications',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: navigate to notifications settings
-                  },
-                ),
-                _ProfileMenuTile(
-                  icon: Icons.help_outline_rounded,
-                  label: 'Help & Support',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: navigate to help page
-                  },
-                ),
-                _ProfileMenuTile(
-                  icon: Icons.settings_outlined,
-                  label: 'Settings',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: navigate to settings page
-                  },
-                ),
-                const Divider(height: 24),
-                _ProfileMenuTile(
-                  icon: Icons.logout_rounded,
-                  label: 'Log Out',
-                  isDestructive: true,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _confirmLogout(pageContext);
-                  },
-                ),
-                const SizedBox(height: 8),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(widget.userName,
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                            Text(widget.userEmail.isNotEmpty ? widget.userEmail : 'No email on file',
+                                style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 32),
+                  _ProfileMenuTile(
+                    icon: Icons.person_outline_rounded,
+                    label: 'Edit Profile',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: navigate to edit profile page
+                    },
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.calendar_today_outlined,
+                    label: 'My Bookings',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: navigate to bookings page
+                    },
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.location_on_outlined,
+                    label: 'Saved Addresses',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: navigate to addresses page
+                    },
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.payment_outlined,
+                    label: 'Payment Methods',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: navigate to payment methods page
+                    },
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.notifications_outlined,
+                    label: 'Notifications',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: navigate to notifications settings
+                    },
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.help_outline_rounded,
+                    label: 'Help & Support',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: navigate to help page
+                    },
+                  ),
+                  _ProfileMenuTile(
+                    icon: Icons.settings_outlined,
+                    label: 'Settings',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: navigate to settings page
+                    },
+                  ),
+                  const Divider(height: 24),
+                  _ProfileMenuTile(
+                    icon: Icons.logout_rounded,
+                    label: 'Log Out',
+                    isDestructive: true,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _confirmLogout(pageContext);
+                    },
+                  ),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
@@ -405,7 +678,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const RoleSelectionPage()),
-        (route) => false,
+            (route) => false,
       );
     }
   }
@@ -553,7 +826,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                       children: [
                         Icon(Icons.search_off_rounded, size: 40, color: Colors.grey.shade400),
                         const SizedBox(height: 8),
-                        Text('No services match your search',
+                        Text('No service providers match your search',
                             style: TextStyle(color: Colors.grey.shade600)),
                       ],
                     ),
@@ -566,9 +839,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     delegate: SliverChildBuilderDelegate(
                           (context, index) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: _ServiceCard(
-                          service: _searchResults[index],
-                          onTap: () => _openBooking(_searchResults[index]),
+                        child: _ProviderListTile(
+                          provider: _searchResults[index],
+                          onTap: () => _openBookingForm(_searchResults[index]),
                         ),
                       ),
                       childCount: _searchResults.length,
@@ -612,40 +885,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                       onTap: () => _openCategoryResults(_categories[index].name),
                     ),
                     childCount: _categories.length,
-                  ),
-                ),
-              ),
-
-              // How it works
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                sliver: SliverToBoxAdapter(
-                  child: Text('How It Works',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: kDarkText)),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-                sliver: SliverToBoxAdapter(
-                  child: Row(
-                    children: _steps
-                        .map((s) => Expanded(
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: const BoxDecoration(color: kLightGreenBg, shape: BoxShape.circle),
-                            child: Icon(s.$2, color: kPrimaryGreen, size: 22),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(s.$3,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ))
-                        .toList(),
                   ),
                 ),
               ),
@@ -764,11 +1003,13 @@ class _CategoryTile extends StatelessWidget {
   }
 }
 
-class _ServiceCard extends StatelessWidget {
-  final Service service;
+// Shared row-style card for a real ProviderProfile — used by search
+// results, category results, and the "All Services" page.
+class _ProviderListTile extends StatelessWidget {
+  final ProviderProfile provider;
   final VoidCallback onTap;
 
-  const _ServiceCard({required this.service, required this.onTap});
+  const _ProviderListTile({required this.provider, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -783,29 +1024,28 @@ class _ServiceCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(color: kLightGreenBg, borderRadius: BorderRadius.circular(14)),
-              child: Icon(service.icon, color: kPrimaryGreen, size: 26),
+            const CircleAvatar(
+              radius: 26,
+              backgroundColor: kLightGreenBg,
+              child: Icon(Icons.person_rounded, color: kPrimaryGreen),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(service.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  Text(provider.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                   const SizedBox(height: 2),
-                  Text(service.providerName, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  Text(provider.displayRole, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
-                      const SizedBox(width: 2),
-                      Text('${service.rating} (${service.reviews})', style: const TextStyle(fontSize: 11)),
-                      const SizedBox(width: 10),
-                      Text('Rs. ${service.priceNpr}',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kPrimaryGreen)),
+                      const Icon(Icons.star_rounded, size: 15, color: Colors.amber),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${provider.rating.toStringAsFixed(1)} (${provider.reviewsCount} reviews)',
+                        style: const TextStyle(fontSize: 12),
+                      ),
                     ],
                   ),
                 ],
@@ -821,9 +1061,14 @@ class _ServiceCard extends StatelessWidget {
 
 class _CategoryResultsPage extends StatelessWidget {
   final String categoryName;
-  final List<Service> services;
+  final List<ProviderProfile> providers;
+  final ValueChanged<ProviderProfile> onBook;
 
-  const _CategoryResultsPage({required this.categoryName, required this.services});
+  const _CategoryResultsPage({
+    required this.categoryName,
+    required this.providers,
+    required this.onBook,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -834,25 +1079,20 @@ class _CategoryResultsPage extends StatelessWidget {
         foregroundColor: kDarkText,
         elevation: 0,
       ),
-      body: services.isEmpty
+      body: providers.isEmpty
           ? Center(
-        child: Text('No services available in $categoryName yet',
+        child: Text('No service providers available in $categoryName yet',
             style: TextStyle(color: Colors.grey.shade600)),
       )
           : ListView.separated(
         padding: const EdgeInsets.all(20),
-        itemCount: services.length,
+        itemCount: providers.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
-          final service = services[index];
-          return _ServiceCard(
-            service: service,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => BookingPage(service: service)),
-              );
-            },
+          final provider = providers[index];
+          return _ProviderListTile(
+            provider: provider,
+            onTap: () => onBook(provider),
           );
         },
       ),
@@ -860,9 +1100,12 @@ class _CategoryResultsPage extends StatelessWidget {
   }
 }
 
-// ── "View All" → Popular Services (all services, grouped by category) ──
+// ── "View All" → Popular Services (all providers, grouped by category) ──
 class _AllServicesPage extends StatefulWidget {
-  const _AllServicesPage();
+  final List<ProviderProfile> providers;
+  final ValueChanged<ProviderProfile> onBook;
+
+  const _AllServicesPage({required this.providers, required this.onBook});
 
   @override
   State<_AllServicesPage> createState() => _AllServicesPageState();
@@ -872,15 +1115,19 @@ class _AllServicesPageState extends State<_AllServicesPage> {
   String _selectedFilter = 'All';
 
   List<String> get _filters {
-    final categories = sampleServices.map((s) => s.category).toSet().toList();
+    final categories = widget.providers
+        .map((p) => p.serviceCategory)
+        .whereType<String>()
+        .toSet()
+        .toList();
     return ['All', ...categories];
   }
 
   @override
   Widget build(BuildContext context) {
     final filtered = _selectedFilter == 'All'
-        ? sampleServices
-        : sampleServices.where((s) => s.category == _selectedFilter).toList();
+        ? widget.providers
+        : widget.providers.where((p) => p.serviceCategory == _selectedFilter).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -922,20 +1169,22 @@ class _AllServicesPageState extends State<_AllServicesPage> {
           ),
           const SizedBox(height: 4),
           Expanded(
-            child: ListView.separated(
+            child: filtered.isEmpty
+                ? Center(
+              child: Text(
+                'No service providers yet.',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              ),
+            )
+                : ListView.separated(
               padding: const EdgeInsets.all(20),
               itemCount: filtered.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
-                final service = filtered[index];
-                return _ServiceCard(
-                  service: service,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => BookingPage(service: service)),
-                    );
-                  },
+                final provider = filtered[index];
+                return _ProviderListTile(
+                  provider: provider,
+                  onTap: () => widget.onBook(provider),
                 );
               },
             ),
@@ -949,8 +1198,9 @@ class _AllServicesPageState extends State<_AllServicesPage> {
 // ── "View All" → Top Rated Professionals ──
 class _AllProfessionalsPage extends StatelessWidget {
   final List<ProviderProfile> professionals;
+  final ValueChanged<ProviderProfile> onBook;
 
-  const _AllProfessionalsPage({required this.professionals});
+  const _AllProfessionalsPage({required this.professionals, required this.onBook});
 
   @override
   Widget build(BuildContext context) {
@@ -965,58 +1215,74 @@ class _AllProfessionalsPage extends StatelessWidget {
       ),
       body: sorted.isEmpty
           ? Center(
-              child: Text(
-                'No service providers yet.',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-              ),
-            )
+        child: Text(
+          'No service providers yet.',
+          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+        ),
+      )
           : ListView.separated(
-              padding: const EdgeInsets.all(20),
-              itemCount: sorted.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final p = sorted[index];
-                return Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade200),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 26,
-                        backgroundColor: kLightGreenBg,
-                        child: Icon(Icons.person_rounded, color: kPrimaryGreen),
+        padding: const EdgeInsets.all(20),
+        itemCount: sorted.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final p = sorted[index];
+          return Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => onBook(p),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade200),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    const CircleAvatar(
+                      radius: 26,
+                      backgroundColor: kLightGreenBg,
+                      child: Icon(Icons.person_rounded, color: kPrimaryGreen),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                          const SizedBox(height: 2),
+                          Text(p.displayRole, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(Icons.star_rounded, size: 15, color: Colors.amber),
+                              const SizedBox(width: 3),
+                              Text(
+                                '${p.rating.toStringAsFixed(1)} (${p.reviewsCount} reviews)',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                            const SizedBox(height: 2),
-                            Text(p.displayRole, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.star_rounded, size: 15, color: Colors.amber),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '${p.rating.toStringAsFixed(1)} (${p.reviewsCount} reviews)',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: kLightGreenBg,
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
-                    ],
-                  ),
-                );
-              },
+                      child: const Text('Book',
+                          style: TextStyle(fontSize: 12, color: kPrimaryGreen, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              ),
             ),
+          );
+        },
+      ),
     );
   }
 }
